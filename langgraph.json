@@ -1,0 +1,13 @@
+{
+    "dockerfile_lines": [],
+    "graphs": {
+      "research_agent": "./src/factory_research_agent.py:researcher_subgraph",
+      "full_agent": "./src/agent.py:agent_graph",
+      "supervisor_agent": "./src/supervisor.py:supervisor_subgraph"
+    },
+    "python_version": "3.11",
+    "env": ".env",
+    "dependencies": [
+      "."
+    ]
+  }

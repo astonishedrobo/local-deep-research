@@ -1,0 +1,15 @@
+pyproject.toml
+deep_research_from_scratch.egg-info/PKG-INFO
+deep_research_from_scratch.egg-info/SOURCES.txt
+deep_research_from_scratch.egg-info/dependency_links.txt
+deep_research_from_scratch.egg-info/requires.txt
+deep_research_from_scratch.egg-info/top_level.txt
+src/agent.py
+src/configs.py
+src/factory_research_agent.py
+src/kg_search_manager.py
+src/prompts.py
+src/states.py
+src/supervisor.py
+src/tools.py
+src/utils.py

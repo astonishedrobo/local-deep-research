@@ -1,0 +1,24 @@
+.secureignore
+
+# Ignore the .env file specifically
+.env
+settings.yaml
+
+# Ignore all .* files
+*.ipynb
+*.py
+*.toml
+.*
+*.json
+
+# Directories
+kg/
+kg_sansad/
+src/
+kg_climate/
+
+# Other
+.venv/
+__pycache__/
+.langgraph_api/
+.vscode/
