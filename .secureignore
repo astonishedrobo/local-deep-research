@@ -16,6 +16,7 @@ kg/
 kg_sansad/
 src/
 kg_climate/
+extra/
 
 # Other
 .venv/

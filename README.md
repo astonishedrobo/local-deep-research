@@ -11,7 +11,11 @@ cd local-deep-research
 ```
 
 ```bash
+# For local testing
 uvx --refresh --from "langgraph-cli[inmem]" --with-editable . --python 3.11 langgraph dev --allow-blocking
+
+# For prototype deployment
+UV_NO_SANDBOX=1 uvx --from "langgraph-cli[inmem]" --with-editable . --python 3.11 langgraph dev --allow-blocking --tunnel --no-browser
 ```
 
 ### 3. Dir Structure
