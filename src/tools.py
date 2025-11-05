@@ -1,5 +1,6 @@
 from src.states import RunBashInput, RunPythonInput, KgQueryInput
 from src.kg_search_manager import get_searcher
+from src.rag_indexing import ParliamentaryQARetriever
 
 
 # from langchain_core.runnables import RunnableConfig
@@ -49,11 +50,23 @@ async def think_tool(reflection: str) -> str:
     """
     return f"Thinking Reflection: {reflection}"
 
+# @tool("QueryKnowledgeGraph", args_schema=KgQueryInput)
+# async def QueryKnowledgeGraph(search_query: str) -> dict:
+#     """API to query the knowledge graph in the 'kg' directory."""
+#     searcher = get_searcher("kg")
+#     response = await searcher.search(search_query)
+#     return response
+
+## Test w/ using RAG indexing
 @tool("QueryKnowledgeGraph", args_schema=KgQueryInput)
 async def QueryKnowledgeGraph(search_query: str) -> dict:
     """API to query the knowledge graph in the 'kg' directory."""
-    searcher = get_searcher("kg")
-    response = await searcher.search(search_query)
+    searcher = ParliamentaryQARetriever(
+        collection_name="parliamentary_questions",
+        openai_api_key=os.getenv("OPENAI_API_KEY")
+    )
+    searcher.load_index()
+    response = searcher.get_formatted_context(search_query, k=3)
     return response
 
 class RunBashCommands(BaseTool):

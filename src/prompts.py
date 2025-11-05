@@ -141,7 +141,7 @@ The report should be structured like this:
 - IMPORTANT: Number sources sequentially without gaps (1,2,3,4...) in the final list regardless of which sources you choose
 - Example format:
   [1] Source (e.g <filename.csv>):  <Exact information(s) retrieved> (for structured_researcher)
-  [2] Source (e.g <Knowledge Graph Query>): <exact knowledge graph query used> (for unstructured_researcher)
+  [2] Source (e.g <source name/metadata from kg query response>): <exact information retrieved in quote> (for unstructured data types list multiple if applicable)
 </Citation Rules>
 
 Critical Reminder: It is extremely important that any information that is even remotely relevant to the user's research topic is preserved verbatim (e.g. don't rewrite it, don't summarize it, don't paraphrase it).
@@ -381,7 +381,7 @@ Format the report in clear markdown with proper structure and include source ref
 - Each source should be a separate line item in a list, so that in markdown it is rendered as a list.
 - Example format:
   [1] Source (e.g <filename.csv>):  <Exact information(s) retrieved> (for structured data types)
-  [2] Source (e.g <source name from kg query response>): <exact information retrieved> (for unstructured data types)
+  [2] Source (e.g <source name/metadata from kg query response>): <exact information retrieved in quote> (for unstructured data types)
 - Citations are extremely important. Make sure to include these, and pay a lot of attention to getting these right. Users will often use these citations to look into more information.
 </Citation Rules>
 """

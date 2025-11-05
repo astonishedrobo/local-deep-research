@@ -20,6 +20,10 @@ dependencies = [
 "pandas>=2.2.3",
 "docker>=7.1.0",
 "graphrag==2.3.0",
+"qdrant-client",
+"openai",
+"rank-bm25",
+"numpy"
 ]
 
 [project.optional-dependencies]

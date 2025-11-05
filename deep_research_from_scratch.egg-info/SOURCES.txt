@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 deep_research_from_scratch.egg-info/PKG-INFO
 deep_research_from_scratch.egg-info/SOURCES.txt
@@ -9,6 +10,7 @@ src/configs.py
 src/factory_research_agent.py
 src/kg_search_manager.py
 src/prompts.py
+src/rag_indexing.py
 src/states.py
 src/supervisor.py
 src/tools.py

@@ -19,6 +19,10 @@ Requires-Dist: pathspec>=0.12.1
 Requires-Dist: pandas>=2.2.3
 Requires-Dist: docker>=7.1.0
 Requires-Dist: graphrag==2.3.0
+Requires-Dist: qdrant-client
+Requires-Dist: openai
+Requires-Dist: rank-bm25
+Requires-Dist: numpy
 Provides-Extra: dev
 Requires-Dist: mypy>=1.11.1; extra == "dev"
 Requires-Dist: ruff>=0.6.1; extra == "dev"
