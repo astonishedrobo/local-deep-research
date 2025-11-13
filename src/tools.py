@@ -66,7 +66,7 @@ async def QueryKnowledgeGraph(search_query: str) -> dict:
         openai_api_key=os.getenv("OPENAI_API_KEY")
     )
     searcher.load_index()
-    response = searcher.get_formatted_context(search_query, k=3)
+    response = searcher.get_formatted_context(search_query, k=10)
     return response
 
 class RunBashCommands(BaseTool):

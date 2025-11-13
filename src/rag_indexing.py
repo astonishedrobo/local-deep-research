@@ -12,9 +12,11 @@ from qdrant_client.models import (
     Distance, VectorParams, PointStruct, 
     Filter, FieldCondition, MatchValue
 )
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from rank_bm25 import BM25Okapi
 import uuid
+import asyncio
+import tiktoken
 
 
 @dataclass
@@ -26,6 +28,7 @@ class QuestionDocument:
     ministry: str
     question_text: str
     answer_text: str
+    pdf_url: str = ""
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'QuestionDocument':
@@ -36,7 +39,8 @@ class QuestionDocument:
             subject=data.get("Subject", ""),
             ministry=data.get("Ministry", ""),
             question_text=data.get("Question Text", ""),
-            answer_text=data.get("Answer Text", "")
+            answer_text=data.get("Answer Text", ""),
+            pdf_url=data.get("PDF URL", "")
         )
     
     def get_search_text(self) -> str:
@@ -73,32 +77,70 @@ class ParliamentaryQARetriever:
         # Initialize Qdrant client
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
         
-        # Initialize OpenAI client
+        # Initialize OpenAI clients (both sync and async)
         self.openai_client = OpenAI(api_key=openai_api_key)
+        self.async_openai_client = AsyncOpenAI(api_key=openai_api_key)
+        
+        # Initialize tokenizer for text truncation
+        try:
+            self.tokenizer = tiktoken.encoding_for_model(embedding_model)
+        except KeyError:
+            # Fallback to cl100k_base for newer models
+            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+        
+        # Maximum tokens for embedding model (will be set per operation)
+        self.max_tokens = None
         
         # BM25 index (loaded when needed)
         self.bm25_index = None
         self.bm25_documents = []
         self.bm25_doc_ids = []
         
-    def _get_embedding(self, text: str) -> List[float]:
+    def _truncate_text(self, text: str, max_tokens: int) -> str:
+        """Truncate text to fit within token limit"""
+        tokens = self.tokenizer.encode(text)
+        if len(tokens) <= max_tokens:
+            return text
+        
+        # Truncate tokens and decode back to text
+        truncated_tokens = tokens[:max_tokens]
+        truncated_text = self.tokenizer.decode(truncated_tokens)
+        print(f"Warning: Text truncated from {len(tokens)} to {max_tokens} tokens")
+        return truncated_text
+    
+    def _get_embedding(self, text: str, max_tokens: int = 8000) -> List[float]:
         """Get embedding for text using OpenAI"""
+        # Truncate text if necessary
+        text = self._truncate_text(text, max_tokens)
+        
         response = self.openai_client.embeddings.create(
             input=text,
             model=self.embedding_model
         )
         return response.data[0].embedding
     
-    def _get_embedding_dimension(self) -> int:
+    async def _get_embedding_async(self, text: str, max_tokens: int = 8000) -> List[float]:
+        """Get embedding for text using OpenAI (async)"""
+        # Truncate text if necessary
+        text = self._truncate_text(text, max_tokens)
+        
+        response = await self.async_openai_client.embeddings.create(
+            input=text,
+            model=self.embedding_model
+        )
+        return response.data[0].embedding
+    
+    def _get_embedding_dimension(self, max_tokens: int = 8000) -> int:
         """Get the dimension of the embedding model"""
-        sample_embedding = self._get_embedding("test")
+        sample_embedding = self._get_embedding("test", max_tokens)
         return len(sample_embedding)
     
     def index_documents(
         self,
         json_file_path: str,
         reset_old: bool = False,
-        batch_size: int = 100
+        batch_size: int = 100,
+        max_tokens: int = 8000
     ) -> None:
         """
         Index documents from JSON file into Qdrant
@@ -107,6 +149,7 @@ class ParliamentaryQARetriever:
             json_file_path: Path to JSON file with questions
             reset_old: If True, delete existing collection and recreate
             batch_size: Number of documents to process in each batch
+            max_tokens: Maximum tokens for embedding text (default: 8000)
         """
         # Load documents
         with open(json_file_path, 'r', encoding='utf-8') as f:
@@ -125,7 +168,7 @@ class ParliamentaryQARetriever:
         
         # Create collection if it doesn't exist
         if not collection_exists:
-            embedding_dim = self._get_embedding_dimension()
+            embedding_dim = self._get_embedding_dimension(max_tokens)
             print(f"Creating collection with embedding dimension: {embedding_dim}")
             self.qdrant_client.create_collection(
                 collection_name=self.collection_name,
@@ -166,7 +209,7 @@ class ParliamentaryQARetriever:
             
             # Get search text and embedding
             search_text = doc.get_search_text()
-            embedding = self._get_embedding(search_text)
+            embedding = self._get_embedding(search_text, max_tokens)
             
             # Create point
             point = PointStruct(
@@ -179,6 +222,7 @@ class ParliamentaryQARetriever:
                     "ministry": doc.ministry,
                     "question_text": doc.question_text,
                     "answer_text": doc.answer_text,
+                    "pdf_url": doc.pdf_url,
                     "search_text": search_text
                 }
             )
@@ -249,9 +293,22 @@ class ParliamentaryQARetriever:
         self._build_bm25_index()
         print("Index loaded successfully")
     
-    def _dense_retrieval(self, query: str, k: int) -> List[Dict]:
+    def _dense_retrieval(self, query: str, k: int, max_tokens: int = 8000) -> List[Dict]:
         """Perform dense retrieval using embeddings"""
-        query_embedding = self._get_embedding(query)
+        query_embedding = self._get_embedding(query, max_tokens)
+        
+        results = self.qdrant_client.search(
+            collection_name=self.collection_name,
+            query_vector=query_embedding,
+            limit=k,
+            with_payload=True
+        )
+        
+        return [hit.payload for hit in results]
+    
+    async def _dense_retrieval_async(self, query: str, k: int, max_tokens: int = 8000) -> List[Dict]:
+        """Perform dense retrieval using embeddings (async)"""
+        query_embedding = await self._get_embedding_async(query, max_tokens)
         
         results = self.qdrant_client.search(
             collection_name=self.collection_name,
@@ -303,19 +360,20 @@ class ParliamentaryQARetriever:
         
         return results
     
-    def retrieve(self, query: str, k: int = 5) -> List[Dict]:
+    def retrieve(self, query: str, k: int = 5, max_tokens: int = 8000) -> List[Dict]:
         """
         Retrieve documents using hybrid retrieval
         
         Args:
             query: Search query
             k: Number of documents to retrieve per method
+            max_tokens: Maximum tokens for query embedding (default: 8000)
             
         Returns:
             List of retrieved documents (deduplicated)
         """
         # Perform both retrievals
-        dense_results = self._dense_retrieval(query, k)
+        dense_results = self._dense_retrieval(query, k, max_tokens)
         keyword_results = self._keyword_retrieval(query, k)
         
         # Combine and deduplicate by q_no
@@ -338,34 +396,161 @@ class ParliamentaryQARetriever:
         
         return combined_results
     
-    def get_formatted_context(self, query: str, k: int = 5) -> str:
+    async def retrieve_async(self, query: str, k: int = 5, max_tokens: int = 8000) -> List[Dict]:
+        """
+        Retrieve documents using hybrid retrieval (async)
+        
+        Args:
+            query: Search query
+            k: Number of documents to retrieve per method
+            max_tokens: Maximum tokens for query embedding (default: 8000)
+            
+        Returns:
+            List of retrieved documents (deduplicated)
+        """
+        # Perform both retrievals (dense is async, keyword is sync)
+        dense_results = await self._dense_retrieval_async(query, k, max_tokens)
+        keyword_results = self._keyword_retrieval(query, k)
+        
+        # Combine and deduplicate by q_no
+        seen_q_nos = set()
+        combined_results = []
+        
+        # Add dense results first
+        for doc in dense_results:
+            q_no = doc.get('q_no')
+            if q_no not in seen_q_nos:
+                seen_q_nos.add(q_no)
+                combined_results.append(doc)
+        
+        # Add keyword results
+        for doc in keyword_results:
+            q_no = doc.get('q_no')
+            if q_no not in seen_q_nos:
+                seen_q_nos.add(q_no)
+                combined_results.append(doc)
+        
+        return combined_results
+    
+    def get_formatted_context(self, query: str, k: int = 5, max_tokens: int = 8000) -> str:
         """
         Get formatted context string for retrieved documents
         
         Args:
             query: Search query
             k: Number of documents to retrieve per method
+            max_tokens: Maximum tokens for query embedding (default: 8000)
             
         Returns:
             Formatted context string
         """
-        results = self.retrieve(query, k)
+        results = self.retrieve(query, k, max_tokens)
         
         if not results:
             return "No relevant documents found."
         
         formatted_parts = []
         for i, doc in enumerate(results, 1):
-            part = f"""##### Source: {i} #####
-Q.No. {doc.get('q_no', 'N/A')}; Date: {doc.get('date', 'N/A')}; Subject: {doc.get('subject', 'N/A')}; Ministry: {doc.get('ministry', 'N/A')}
+            # Build metadata section
+            metadata_lines = [
+                f"Q.No.: {doc.get('q_no', 'N/A')}",
+                f"Date: {doc.get('date', 'N/A')}",
+                f"Ministry: {doc.get('ministry', 'N/A')}",
+                f"Subject: {doc.get('subject', 'N/A')}"
+            ]
+            
+            # Add PDF URL if available
+            if doc.get('pdf_url'):
+                metadata_lines.append(f"PDF URL: {doc.get('pdf_url')}")
+            
+            metadata_str = " | ".join(metadata_lines)
+            
+            part = f"""{'='*80}
+SOURCE {i}
+{'='*80}
 
-Question:
+{metadata_str}
+
+QUESTION:
 {doc.get('question_text', 'N/A')}
 
-Answer:
+ANSWER:
 {doc.get('answer_text', 'N/A')}
 """
             formatted_parts.append(part)
         
-        return "\n\n".join(formatted_parts)
+        return "\n".join(formatted_parts)
+    
+    async def get_formatted_context_async(self, query: str, k: int = 5, max_tokens: int = 8000) -> str:
+        """
+        Get formatted context string for retrieved documents (async)
+        
+        Args:
+            query: Search query
+            k: Number of documents to retrieve per method
+            max_tokens: Maximum tokens for query embedding (default: 8000)
+            
+        Returns:
+            Formatted context string
+        """
+        results = await self.retrieve_async(query, k, max_tokens)
+        
+        if not results:
+            return "No relevant documents found."
+        
+        formatted_parts = []
+        for i, doc in enumerate(results, 1):
+            # Build metadata section
+            metadata_lines = [
+                f"Q.No.: {doc.get('q_no', 'N/A')}",
+                f"Date: {doc.get('date', 'N/A')}",
+                f"Ministry: {doc.get('ministry', 'N/A')}",
+                f"Subject: {doc.get('subject', 'N/A')}"
+            ]
+            
+            # Add PDF URL if available
+            if doc.get('pdf_url'):
+                metadata_lines.append(f"PDF URL: {doc.get('pdf_url')}")
+            
+            metadata_str = " | ".join(metadata_lines)
+            
+            part = f"""{'='*80}
+SOURCE {i}
+{'='*80}
 
+{metadata_str}
+
+QUESTION:
+{doc.get('question_text', 'N/A')}
+
+ANSWER:
+{doc.get('answer_text', 'N/A')}
+"""
+            formatted_parts.append(part)
+        
+        return "\n".join(formatted_parts)
+
+
+# Example usage
+if __name__ == "__main__":
+    import os
+    
+    # Initialize retriever
+    retriever = ParliamentaryQARetriever(
+        collection_name="parliamentary_questions",
+        openai_api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    # Index documents (first time or reset)
+    # retriever.index_documents("questions.json", reset_old=True)
+    
+    # OR append to existing index
+    # retriever.index_documents("new_questions.json", reset_old=False)
+    
+    # OR load existing index
+    retriever.load_index()
+    
+    # Query and get formatted context
+    query = "small modular reactors nuclear energy"
+    context = retriever.get_formatted_context(query, k=3)
+    print(context)

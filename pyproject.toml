@@ -25,6 +25,7 @@ dependencies = [
 "numpy",
 "chainlit==2.9.0",
 "aiosqlite>=0.21.0",
+"tiktoken>=0.12.0",
 "streamlit>=1.28.0",
 "graphrag>=2.3.0",
 ]
