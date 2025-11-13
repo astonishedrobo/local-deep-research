@@ -2,7 +2,7 @@
 name = "deep_research_from_scratch"
 version = "0.1.0"
 description = "Build a deep research agent from scratch"
-requires-python = ">=3.11"
+requires-python = ">=3.10,<3.13"
 dependencies = [
 "langgraph>=0.5.4",
 "langchain>=0.3.0",
@@ -19,11 +19,14 @@ dependencies = [
 "pathspec>=0.12.1",
 "pandas>=2.2.3",
 "docker>=7.1.0",
-"graphrag==2.3.0",
 "qdrant-client",
 "openai",
 "rank-bm25",
-"numpy"
+"numpy",
+"chainlit==2.9.0",
+"aiosqlite>=0.21.0",
+"streamlit>=1.28.0",
+"graphrag>=2.3.0",
 ]
 
 [project.optional-dependencies]

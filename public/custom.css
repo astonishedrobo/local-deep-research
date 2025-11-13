@@ -1,0 +1,22 @@
+/* Custom styling for Chainlit login page */
+
+/* Change the login button text to "Login/Register" */
+form button[type="submit"] {
+    font-size: 0 !important;
+}
+
+form button[type="submit"]::after {
+    font-size: 0.875rem !important;
+    content: "Login / Register" !important;
+    display: inline-block;
+}
+
+/* Add helpful hint text below the password field - only once */
+form div:has(> input[type="password"]):not(:has(div))::after {
+    content: "New users will be automatically registered";
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-style: italic;
+}
