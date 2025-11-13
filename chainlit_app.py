@@ -267,52 +267,8 @@ This is a hierarchical multi-agent research system ready to help you with:
 
     # Store the agent graph in user session
     cl.user_session.set("agent_graph", agent_graph)
-    cl.user_session.set("config", {
-        "configurable": {
-            # Default configuration - you can customize these
-            "allow_clarification": True,
-            "max_structured_output_retries": 3,
-            "supervisor_max_iterations": 10,
-            "subagent_concurrency_limit": 3,
-            
-            # Researcher max iterations per category
-            "researcher_max_iterations": {
-                "structured_researcher": 10,
-                "unstructured_researcher": 5,
-            },
-            
-            # LLM configurations
-            "conversation_llm": {
-                "model": "gpt-4o-mini",
-                "temperature": 0.7,
-            },
-            "reporter_llm": {
-                "model": "gpt-4o",
-                "temperature": 0.7,
-            },
-            "supervisor_llm": {
-                "model": "gpt-4o",
-                "temperature": 0.7,
-            },
-            "compressor_llm": {
-                "model": "gpt-4o-mini",
-                "temperature": 0.7,
-            },
-            # Researcher LLM per category
-            "researcher_llm": {
-                "structured_researcher": {
-                    "model": "gpt-4o-mini",
-                    "temperature": 0.7,
-                    "max_tokens": 10000,
-                },
-                "unstructured_researcher": {
-                    "model": "gpt-4o-mini",
-                    "temperature": 0.7,
-                    "max_tokens": 10000,
-                },
-            },
-        }
-    })
+    # Use default configuration from src/configs.py
+    cl.user_session.set("config", {"configurable": {}})
 
 
 @cl.step(type="tool", name="Agent Processing")
